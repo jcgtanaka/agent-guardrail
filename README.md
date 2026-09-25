@@ -15,6 +15,15 @@ configured or approved in the moment.
 Read [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) before relying on this.
 It states plainly what this tool does and does not protect against.
 
+## Disclaimer
+
+This project is provided as-is, MIT licensed: no warranty, and the author
+is not liable for any damages arising from its use, including data loss or
+file corruption. See [LICENSE](LICENSE) for the full terms. Test it in
+your own environment against your own use case before relying on it for
+anything that matters. It reduces risk; it does not eliminate it, and it
+is not a substitute for backups.
+
 ## Why a hook and not just a settings.json deny rule
 
 A `settings.json` deny rule is easy to add and easy to lose: it can be
@@ -110,7 +119,7 @@ a rule that only has a positive test can silently regress.
 This tool answers one question: does this specific tool call touch a path
 I marked protected? It does not replace Claude Code's own `ask` permission
 tier for judgment calls that are not about a fixed path (a force-push, an
-unfamiliar `curl` call, and so on) — configure those directly in
+unfamiliar `curl` call, and so on): configure those directly in
 `settings.json`. It also does not scope credentials or API tokens; that is
 a separate, equally necessary layer covered in
 [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md).
