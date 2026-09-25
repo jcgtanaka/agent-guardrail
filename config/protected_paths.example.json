@@ -1,0 +1,12 @@
+{
+  "protected_paths": [
+    {
+      "path": "~/path/to/your/most-important-project",
+      "reason": "example: replace with a real absolute path you never want an AI agent to edit or delete"
+    },
+    {
+      "path": "~/path/to/live-trading-or-production-code",
+      "reason": "example: any directory whose accidental edit or deletion would cause real damage"
+    }
+  ]
+}
