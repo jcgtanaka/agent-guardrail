@@ -1,5 +1,10 @@
 # agent-guardrail
 
+> **Status: 0.x beta.** Tested on Linux only; macOS and Windows are covered by
+> CI configuration but not verified by hand. It is accident prevention for a
+> cooperating agent, not a security boundary. See
+> [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md).
+
 A small, dependency-free PreToolUse hook for Claude Code (and any harness
 that speaks the same hook protocol). It lets an AI coding agent work freely
 on your files, and stops it at two kinds of line:
