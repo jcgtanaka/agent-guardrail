@@ -1,135 +1,205 @@
 # agent-guardrail
 
 A small, dependency-free PreToolUse hook for Claude Code (and any harness
-that speaks the same hook protocol) that hard-blocks an AI agent from
-editing or deleting files inside paths you mark as protected, even if a
-permissive `settings.json` rule, a permission mode, or a bypass flag would
-otherwise allow it.
+that speaks the same hook protocol). It lets an AI coding agent work freely
+on your files, and stops it at two kinds of line:
 
-It exists for one specific problem: an agent with broad, legitimate access
-to your home directory should still never be able to touch the handful of
-directories where a mistake would actually hurt (your OS files, a
-production strategy, a client's codebase), no matter what else is
-configured or approved in the moment.
+1. **OS-level changes** on Ubuntu, macOS and Windows (system directories,
+   privilege escalation, package managers, services, scheduled tasks).
+2. **Sensitive things you define** in a config file (paths, globs such as
+   `.env`, and credential-looking content).
 
-Read [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) before relying on this.
-It states plainly what this tool does and does not protect against.
+It is permissive by default: everything else is allowed silently, so the
+agent is not stalled by prompts it does not need.
+
+**What it is not:** a sandbox. It reads command text, and command text cannot
+bound what a shell or interpreter will do. Treat it as accident prevention
+and a first line of defence. For an actual boundary, pair it with an
+OS-level layer; `tools/gen_sandbox.py` generates a starting point from the
+same config. Read [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) before
+relying on it.
 
 ## Disclaimer
 
 This project is provided as-is, MIT licensed: no warranty, and the author
 is not liable for any damages arising from its use, including data loss or
-file corruption. See [LICENSE](LICENSE) for the full terms. Test it in
-your own environment against your own use case before relying on it for
-anything that matters. It reduces risk; it does not eliminate it, and it
-is not a substitute for backups.
+file corruption. See [LICENSE](LICENSE). Test it in your own environment
+before relying on it for anything that matters. It reduces risk; it does not
+eliminate it, and it is not a substitute for backups.
 
-## Why a hook and not just a settings.json deny rule
+## The three tiers
 
-A `settings.json` deny rule is easy to add and easy to lose: it can be
-overridden by a later rule, skipped in a permission mode, or bypassed
-entirely by a bypass-permissions flag. Every AI coding agent examined
-while designing this tool (Claude Code, Cursor, Devin, OpenHands)
-independently converged on the same structural answer: put the real
-protection in a layer that sits below configuration and cannot be turned
-off by it. Claude Code's own hooks run before its allow/deny/ask
-evaluation, which is exactly the property this tool relies on.
+| Tier | What happens | Used for |
+|---|---|---|
+| **deny** | Hard block (exit 2). No override from inside the session. | The guard's own script, config and state directory, Claude Code `settings.json` files (where the hook is registered), and any user path with `"tier": "deny"` (the default). |
+| **approve** | Blocked (exit 2) until a human approves that exact action in their own terminal. | OS-level paths and commands, sensitive globs such as `.env` and `*.pem`. |
+| **ask** | Claude Code shows a permission prompt with a distinctive warning, **only in Manual (`default`) mode**. In every other mode, or if the mode is unknown, it is escalated to the `approve` flow (see below). | Uncertain cases: unparseable commands, interpreters (`python -c`), `source` of a protected file, `$VAR` in a write, credential-looking content. |
+| *(none)* | Silent allow. | Everything else. |
 
-A naive path check is also not enough on its own. CVE-2025-53109 and
-CVE-2025-53110 ("EscapeRoute", found in Anthropic's own filesystem MCP
-server) show that a literal string-prefix comparison can be defeated by a
-symlink created inside an allowed directory that points at the protected
-one. This tool resolves every path to its real, symlink-free target before
-checking containment, and the test suite includes that exact symlink
-scenario as a required case, not an afterthought.
+The `ask` text is deliberately unlike Claude Code's routine prompts, so it
+is not clicked through on reflex:
 
-## What it does
+```
+=== AGENT-GUARDRAIL WARNING (not a routine permission prompt) ===
+Detected: <what the command or write does>
+Rule: <which rule fired>
+Could be damaged: <what is at risk>
+Safer alternative: <what to do instead>
+```
 
-For every `Edit`, `Write`, `NotebookEdit`, or `Bash` tool call:
+Every block message tells the agent what to do next, so a denial redirects
+it instead of stalling it.
 
-1. Resolve the real target path (or, for `Bash`, every path-like token in
-   the command) to its canonical, symlink-free form.
-2. If it falls inside a configured protected path, deny the call outright.
-3. For a destructive `Bash` command whose target cannot be statically
-   resolved (it depends on a shell variable or command substitution, such
-   as `rm -rf "$DIR"/*`), ask for human confirmation instead of guessing.
-4. Otherwise, say nothing and exit cleanly, leaving the decision to Claude
-   Code's normal permission flow.
+### Approving a blocked action
 
-If no protected paths are configured, the hook is a silent no-op. See
-docs/THREAT_MODEL.md for what "protected" does and does not cover.
+When an `approve` rule fires, the hook prints an approval id. In your **own
+terminal** (not through the agent):
+
+```bash
+python hooks/guardrail_cli.py approve <id>
+```
+
+The CLI shows the full request, requires an interactive terminal and a typed
+`yes`, then allows that exact action once. The approval expires after
+`ttl_seconds` (default 600) and is consumed on use. Approvals are signed with
+a key in the state directory. Other commands: `list`, `revoke <id>`, `doctor`.
+
+Limit, stated plainly: a same-user agent that finds any unguarded way to write
+a file, or to read the signing key, could forge an approval. An OS layer
+(separate user, root-owned files, sandbox) closes that gap.
 
 ## Install
 
-1. Copy or clone this repository somewhere stable on disk.
-2. Create your own protected-paths config. It is deliberately kept outside
-   the repository so your real paths are never accidentally committed:
+1. Clone this repository somewhere stable on disk. Python 3.8+, standard
+   library only.
+2. Create your config. Keep it outside the repository so real paths are
+   never committed:
 
    ```bash
    mkdir -p ~/.config/agent-guardrail
    cp config/protected_paths.example.json ~/.config/agent-guardrail/protected_paths.json
    ```
 
-   Edit that file and list the absolute paths (`~` is expanded) you never
-   want an agent to write to or delete.
+3. Register the hook by hand in `~/.claude/settings.json` (all projects) or
+   `<project>/.claude/settings.json`. See `config/settings.snippet.json`;
+   replace the placeholder with the absolute path to
+   `hooks/pretooluse_path_guard.py`. The guard protects those files from the
+   agent, so it will not edit them for you.
+4. Start a new Claude Code session, then run
+   `python hooks/guardrail_cli.py doctor` to confirm the config is valid and
+   the hook is registered and not paused.
 
-3. Register the hook in Claude Code's settings. Use
-   `~/.claude/settings.json` if you want protection across every project
-   on this machine, or `<project>/.claude/settings.json` for a single
-   project only. See `config/settings.snippet.json` for the exact shape;
-   replace the placeholder command path with the real, absolute path to
-   `hooks/pretooluse_path_guard.py` on your machine.
-
-4. Restart Claude Code (or start a new session) so it picks up the hook.
+With no config at all, the built-in OS-level and self protection still apply.
 
 ## Configuration reference
-
-`protected_paths.json`:
 
 ```json
 {
   "protected_paths": [
-    { "path": "~/some/critical/project", "reason": "why this is protected" }
-  ]
+    { "path": "~/critical/project", "reason": "why", "tier": "deny" }
+  ],
+  "sensitive_globs": ["**/.env", "**/*.pem"],
+  "sensitive_content_patterns": ["internal-token-[a-z0-9]{16}"],
+  "allow_paths": ["~/critical/project/docs"],
+  "builtin_os_protection": true,
+  "approval": { "ttl_seconds": 600 }
 }
 ```
 
-- `path` is expanded (`~` becomes your home directory) and resolved to its
-  real path at check time, so a symlinked path still resolves correctly.
-- `reason` is for your own documentation; it is not used by the hook logic.
-- The config is looked up in this order: the `AGENT_GUARDRAIL_CONFIG`
-  environment variable if set, then `~/.config/agent-guardrail/protected_paths.json`,
-  then `config/protected_paths.json` inside this repository (not shipped,
-  and git-ignored, so you can use it as a local alternative to the
-  home-directory location if you prefer keeping it next to the hook).
+- `protected_paths`: `path` is expanded and resolved to its real path.
+  `tier` is `deny` (default), `approve` or `ask`.
+- `sensitive_globs`: tier `approve`. Setting it replaces the defaults
+  (`.env*`, `*.pem`, `id_rsa*`, `id_ed25519*`, `credentials`, `.netrc`,
+  `.npmrc`, `.pgpass`, `*.kdbx`).
+- `sensitive_content_patterns`: extra regexes, tier `ask`, checked against
+  the content of Write and Edit calls. Built-in patterns cover PEM private
+  keys, AWS key ids and common provider token prefixes. There are no entropy
+  rules and no network calls.
+- `allow_paths`: narrows protection for a subtree. It never overrides the
+  self-protection tier.
+- `content_scan_timeout_seconds` (default 5): the time limit for scanning a
+  write's content. If a pattern takes longer, the call is blocked (fail
+  closed), which protects against a catastrophic user regex. It uses
+  `SIGALRM`, so it is not available on Windows. Content over 1,000,000
+  characters is only scanned at its start and end, and raises an `ask`
+  saying so.
+- Paths and globs in the config may not contain control characters (newline,
+  tab and similar); such a config is rejected.
+- `builtin_os_protection`: the per-OS tables in
+  [hooks/guardrail_defaults.py](hooks/guardrail_defaults.py).
+- Config lookup order: `AGENT_GUARDRAIL_CONFIG`, then
+  `~/.config/agent-guardrail/protected_paths.json`, then
+  `config/protected_paths.json` in this repository (git-ignored).
+- `AGENT_GUARDRAIL_STATE_DIR` overrides where pending requests and approvals
+  are stored.
+
+A present but invalid config, malformed hook input, or any internal error
+**fails closed** (exit 2). It never silently allows.
+
+The built-in OS tables are this project's own compilation from general
+operating-system knowledge: no authoritative, agent-oriented catalog exists.
+Review them for your machines.
+
+## Bash analysis
+
+For `Bash` calls the hook splits compound commands (including newlines),
+looks inside `bash -c` and command substitutions, unwraps `sudo`, `env`,
+`xargs` and similar, strips harmless redirects such as `2>/dev/null`, and
+resolves the target arguments of **recognised** write commands (`rm`, `mv`,
+`cp`, `tee`, `sed -i`, redirects and similar) to their real path before
+checking containment. Prefix matching uses path-component boundaries on real
+paths, so `/protected-evil` does not match `/protected`.
+
+Commands the hook does not recognise are only caught when their text names a
+protected location, and then they raise an `ask`. That includes interpreter
+one-liners (`python -c`), and `source` or `.` of a file inside a protected
+location. The contents of a sourced script are never inspected.
+
+This is best-effort. No static analysis can list every way a shell or
+interpreter can write a file.
+
+### Which tools are checked
+
+Any tool call that carries a `file_path`, `notebook_path` or `path` field is
+treated as a file write, so `MultiEdit` and MCP write tools are covered, and
+the contents of `MultiEdit` edits are scanned for credentials. `Read`,
+`Glob`, `Grep` and `LS` are not. The hook only runs for tools your
+`settings.json` matcher lists, so widen the matcher (see
+`config/settings.snippet.json`) to include `MultiEdit` and the MCP tools you
+use. `python hooks/guardrail_cli.py doctor` warns when the matcher covers none
+of the guarded tools.
+
+## OS layer
+
+```bash
+python tools/gen_sandbox.py bwrap      # Linux (bubblewrap)
+python tools/gen_sandbox.py seatbelt   # macOS (sandbox-exec)
+python tools/gen_sandbox.py windows    # WSL2 advice and icacls recipe
+```
+
+The tool only prints text and never runs anything. Output is a starting
+point that is **not tested on your system**: review it before use.
 
 ## Testing
 
 ```bash
 pip install pytest
-pytest tests/ -v
+python -m pytest
 ```
 
-Every protected-path test has a matching disguised-access test (a symlink,
-for the filesystem tools). If you extend this tool, extend both together:
-a rule that only has a positive test can silently regress.
+Tests run the hook as a subprocess against an isolated HOME, config and state
+directory, so they never touch your real environment. The suite has been run
+on Linux only; macOS and Windows behaviour is covered by CI configuration but
+has not been verified by hand.
 
-## Scope
+## Evidence and verification status
 
-This tool answers one question: does this specific tool call touch a path
-I marked protected? It does not replace Claude Code's own `ask` permission
-tier for judgment calls that are not about a fixed path (a force-push, an
-unfamiliar `curl` call, and so on): configure those directly in
-`settings.json`. It also does not scope credentials or API tokens; that is
-a separate, equally necessary layer covered in
-[docs/THREAT_MODEL.md](docs/THREAT_MODEL.md).
-
-## References
-
-This design is grounded in a literature and industry review, not a single
-source. See [REFERENCES.md](REFERENCES.md) for the full source list in APA
-format, including a table mapping each design decision in this repository
-to the source that drove it.
+The design choices (fail closed, OS layer as the boundary, command text as
+accident prevention, self-protection) rest on a literature and vendor-docs
+review. [docs/DESIGN_RATIONALE.md](docs/DESIGN_RATIONALE.md) lists what is
+primary-source verified, what is a preprint, and which figures are vendor
+claims without methodology. The older source list is in
+[REFERENCES.md](REFERENCES.md).
 
 ## License
 
