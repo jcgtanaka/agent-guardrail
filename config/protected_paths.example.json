@@ -2,11 +2,23 @@
   "protected_paths": [
     {
       "path": "~/path/to/your/most-important-project",
-      "reason": "example: replace with a real absolute path you never want an AI agent to edit or delete"
+      "reason": "example: a directory you never want an AI agent to edit or delete",
+      "tier": "deny"
     },
     {
       "path": "~/path/to/live-trading-or-production-code",
-      "reason": "example: any directory whose accidental edit or deletion would cause real damage"
+      "reason": "example: edits are possible, but only after you approve the exact change in your own terminal",
+      "tier": "approve"
+    },
+    {
+      "path": "~/path/to/shared-config",
+      "reason": "example: the agent may proceed only after you confirm a distinctive warning",
+      "tier": "ask"
     }
-  ]
+  ],
+  "sensitive_globs": ["**/.env", "**/.env.*", "**/*.pem", "**/id_rsa*", "**/id_ed25519*"],
+  "sensitive_content_patterns": ["internal-token-[a-z0-9]{16}"],
+  "allow_paths": [],
+  "builtin_os_protection": true,
+  "approval": { "ttl_seconds": 600 }
 }

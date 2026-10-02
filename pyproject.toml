@@ -1,0 +1,5 @@
+# Tooling configuration only: agent-guardrail is a set of stdlib-only scripts,
+# not an installable package.
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
