@@ -110,7 +110,12 @@ an `ask` instead of being allowed, and `tools/gen_sandbox.py` exists.
 
 - The full text of the Five Eyes agentic-AI adoption guidance, NIST SP
   800-53 AC-6 mapping, and CIS control lists were not opened.
-- Behaviour on macOS and Windows: the test suite has been run on Linux only.
+- Windows behaviour. CI passes on Linux and macOS. On the first Windows run,
+  13 of 335 tests failed: nine Bash-analysis cases where a protected path
+  named inside a command was not detected (cause not yet found; a path
+  separator mismatch in the text matcher is a hypothesis only), and four
+  sandbox-generator tests that assume POSIX paths. Windows is marked
+  experimental.
 - What a hook's JSON `ask` does outside Manual mode is not stated in the
   documentation (the hooks reference lists `permission_mode` and its values
   but does not say how `ask` interacts with `auto` or `bypassPermissions`).

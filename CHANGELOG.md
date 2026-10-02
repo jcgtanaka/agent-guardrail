@@ -16,7 +16,9 @@
   Windows/WSL2 starting points from the same config.
 - Shell-aware Bash analysis: compound commands, newlines, `bash -c`,
   command substitution and common wrappers.
-- CI workflow running the tests on Linux, macOS and Windows.
+- CI workflow running the tests on Linux, macOS and Windows. Windows is
+  experimental: its job may fail, nine tests are expected failures and four
+  are skipped there.
 
 ### Changed
 - A missing config no longer disables the hook: built-in OS-level and

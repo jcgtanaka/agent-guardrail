@@ -1,8 +1,10 @@
 # agent-guardrail
 
-> **Status: 0.x beta.** Tested on Linux only; macOS and Windows are covered by
-> CI configuration but not verified by hand. It is accident prevention for a
-> cooperating agent, not a security boundary. See
+> **Status: 0.x beta.** Tested on Linux and macOS (CI). **Windows is
+> experimental**: on the first CI run, 13 of 335 tests failed there, including
+> nine Bash-analysis cases where protected paths named inside a command were
+> not detected. Do not rely on it on Windows yet. It is accident prevention
+> for a cooperating agent, not a security boundary. See
 > [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md).
 
 A small, dependency-free PreToolUse hook for Claude Code (and any harness
@@ -193,9 +195,11 @@ python -m pytest
 ```
 
 Tests run the hook as a subprocess against an isolated HOME, config and state
-directory, so they never touch your real environment. The suite has been run
-on Linux only; macOS and Windows behaviour is covered by CI configuration but
-has not been verified by hand.
+directory, so they never touch your real environment. CI runs the suite on
+Linux and macOS (Python 3.9 and 3.12), where it passes. On Windows the CI job is
+allowed to fail: nine Bash-analysis tests are marked as expected failures and
+four sandbox-generator tests are skipped (see `tests/conftest.py`). Fixing
+Windows support is open work.
 
 ## Evidence and verification status
 

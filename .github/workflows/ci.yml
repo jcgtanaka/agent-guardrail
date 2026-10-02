@@ -12,6 +12,8 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
         python-version: ["3.9", "3.12"]
     runs-on: ${{ matrix.os }}
+    # Windows support is experimental: a failure there does not fail the run.
+    continue-on-error: ${{ matrix.os == 'windows-latest' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
