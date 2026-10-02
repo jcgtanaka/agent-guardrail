@@ -22,10 +22,55 @@ any specific claim in this repository.
 |---|---|
 | A hard, non-configurable deny layer runs before the configurable allow/deny/ask rules | Anthropic (n.d.-a); Anysphere (n.d.-a); *ScopeGate* (2026) |
 | Every path is resolved to its real, symlink-free target before a containment check | Cymulate (2025) |
-| A destructive Bash command with an unresolvable shell-variable target is asked about, not silently allowed or silently blocked | Anthropic (n.d.-b); Watson (2026) |
+| A write-capable Bash command with an unresolvable shell-variable target is treated as uncertain: a distinctive prompt in Manual mode, an out-of-band approval in every other mode | Anthropic (n.d.-b); Watson (2026); Anthropic (n.d.-d) |
 | The real protected-paths config lives outside the published repository | endolith (2023) |
 | docs/THREAT_MODEL.md states plainly that credential and API misuse is out of scope | The Register (2025, 2026); Zenity (2026) |
-| Every protected-path test has a matching disguised-access (symlink) test | Open Policy Agent (n.d.) |
+| The test suite includes disguised-access cases (symlinks, relative paths, sibling-prefix directories) alongside the plain ones | Open Policy Agent (n.d.); Cymulate (2025) |
+| Command-text analysis is accident prevention, not a boundary; the OS layer is the boundary | Anthropic (n.d.-e); Chen & Lin (2026); Liu et al. (2026) |
+| Blocks use exit code 2, and any internal problem fails closed | Anthropic (n.d.-d); Cymulate (2025) |
+| Approval is rare, tied to one exact action, and given out-of-band | Shi et al. (2026); Yan (2026); Wang et al. (2026) |
+| Native `ask` is trusted only in Manual mode | Anthropic (n.d.-d); Ji et al. (2026) |
+
+## Command guards, approval and sandboxing (added with the tiered redesign)
+
+A second research round, focused on papers and primary sources, backs the
+tiered redesign. Evidence quality for each item is graded in
+[docs/DESIGN_RATIONALE.md](docs/DESIGN_RATIONALE.md). All arXiv items below
+are preprints except Liu et al., which lists ISSRE 2026 in its arXiv comments.
+Titles and authors were read from the arXiv abstract pages.
+
+Anthropic. (n.d.-d). *Hooks reference*. Claude Code Documentation.
+https://code.claude.com/docs/en/hooks
+
+Anthropic. (n.d.-e). *Configure permissions*. Claude Code Documentation.
+https://code.claude.com/docs/en/permissions
+
+Chen, C., & Lin, Z. (2026). *One goal, many commands: Characterizing denylist
+fragility in AI agents* [Preprint]. arXiv:2606.15549.
+https://arxiv.org/abs/2606.15549 (The paper cites two different denylist
+counts, 1,709 and 1,731, alongside the same 13,332 rules; this project cites
+1,709, which appears in the abstract.)
+
+Liu, Y., Zhang, W., Yang, Z., Zhang, Z., Feng, H., Wang, X., Qiu, P., Liu, Y.,
+Poczos, B., & Hong, J. B. (2026). *CARE: Pre-execution command verification
+for shell-executing LLM agents*. arXiv:2607.21642.
+https://arxiv.org/abs/2607.21642
+
+Ji, Z., Li, Z., Jiang, W., Gao, Y., & Wang, S. (2026). *Measuring the
+permission gate: A stress-test evaluation of Claude Code's auto mode*
+[Preprint]. arXiv:2604.04978. https://arxiv.org/abs/2604.04978
+
+Shi, T., He, J., Wang, Z., Li, H., Wu, L., Guo, W., & Song, D. (2026).
+*Progent* [Preprint]. arXiv:2504.11703. https://arxiv.org/abs/2504.11703
+(Full title not recorded in the research notes; see the arXiv page.)
+
+Wang, P., Li, Y., & Tian, Y. (2026). *Reframing LLM agent security as an
+agent-human interaction problem* [Preprint]. arXiv:2605.24309.
+https://arxiv.org/abs/2605.24309
+
+Yan, T. (2026). *Do user-authored permission policies improve protection
+against AI agent overreach?* [Preprint]. arXiv:2608.27443.
+https://arxiv.org/abs/2608.27443
 
 ## Formal verification and capability theory
 
